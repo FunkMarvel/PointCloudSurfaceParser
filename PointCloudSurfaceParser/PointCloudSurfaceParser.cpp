@@ -43,7 +43,7 @@ void processData(const std::string& fileName)
     std::cout << bounds.xmin << " | " << bounds.xmax << " | " << bounds.ymin << " | " << bounds.ymax << " | " << bounds.
         xExtent << " | " << bounds.yExtent << std::endl;
 
-    constexpr float stepLength = 5.f; // step length [m]
+    constexpr float stepLength = 10.f; // step length [m]
     const int numStepsX = static_cast<int>(ceil(bounds.xExtent / stepLength));
     const int numStepsY = static_cast<int>(ceil(bounds.yExtent / stepLength));
 
@@ -121,11 +121,11 @@ void processData(const std::string& fileName)
         
     }
 
-    writeVertexData("../ProcessedData/bigVertex.txt", grid, Eigen::Vector3f{
-                        0.5f * (bounds.xmin + bounds.xmax), 0.5f * (bounds.ymin + bounds.ymax),
-                        0.5f * (bounds.zmin + bounds.zmax)
+    writeVertexData("../ProcessedData/vertices.txt", grid, Eigen::Vector3f{
+                        0.5f * (bounds.xExtent), 0.5f * (bounds.yExtent),
+                        0.5f * (bounds.zExtent)
                     }, 0.5f, 0.5f, 0.5f);
-    writeIndexFile("../ProcessedData/bigIndex.txt", numStepsX, numStepsY);
+    writeIndexFile("../ProcessedData/indices.txt", numStepsX, numStepsY);
 }
 
 void writeVertexData(const std::string& filePath, const std::vector<std::vector<Eigen::Vector3f>>& dataGrid,
@@ -164,15 +164,28 @@ void writeIndexFile(const std::string& filePath, int numX, int numY)
         throw std::runtime_error(msg);
     }
 
-    outFile << 2*(numX-1)*(numY-1) << "\n";
+    std::vector<int> indices{};
 
-    for (int j = 0; j < numY-1; ++j)
+    for(unsigned int i = 0; i < numX-1; i++)       // for each row a.k.a. each strip
     {
-        for (int i = 0; i < numX-1; ++i)
+        for (unsigned int j = 0; j < numY-1; j++) // for each column
         {
-            outFile << i + j*numX << " " << i + (j+1)*numX << " " << i+1 + j*numX << " -1" << " -1" << " -1" << "\n";
-            outFile << i+1 + j*numX << " " << i + (j+1)*numX << " " << i+1 + (j+1)*numX << " -1" << " -1" << " -1" << "\n";
+            indices.emplace_back(j+i*numY);
+            indices.emplace_back((j+1)+i*numY);
+            indices.emplace_back(j+(i+1)*numY);
+
+            indices.emplace_back((j+1)+i*numY);
+            indices.emplace_back((j+1)+(i+1)*numY);
+            indices.emplace_back(j+(i+1)*numY);
         }
+    }
+
+    outFile << 2*(numY-1)*(numX-1) << "\n";
+    std::cout << indices.size() << " " << 2*(numY-1)*(numX-1) << std::endl;
+
+    for (size_t i = 2; i < indices.size(); i+=3)
+    {
+        outFile << indices[i-2] << " " << indices[i-1] << " " << indices[i] << " " << -1 << " " << -1 << " " << -1 << "\n";
     }
 
     outFile.close();
