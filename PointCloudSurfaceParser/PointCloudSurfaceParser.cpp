@@ -43,7 +43,7 @@ void processData(const std::string& fileName)
     std::cout << bounds.xmin << " | " << bounds.xmax << " | " << bounds.ymin << " | " << bounds.ymax << " | " << bounds.
         xExtent << " | " << bounds.yExtent << std::endl;
 
-    constexpr float stepLength = 10.f; // step length [m]
+    constexpr float stepLength = 5.f; // step length [m]
     const int numStepsX = static_cast<int>(ceil(bounds.xExtent / stepLength));
     const int numStepsY = static_cast<int>(ceil(bounds.yExtent / stepLength));
 
