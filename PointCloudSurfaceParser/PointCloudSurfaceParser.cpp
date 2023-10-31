@@ -1,7 +1,7 @@
 // //////////////////////////////////////////////////////////////////////////
 // //////////////////////////////
 // //FileName: PointCloudSurfaceParser.cpp
-// //FileType: Visual C# Source file
+// //FileType: Visual C++ Source file
 // //Author : Anders P. Åsbø
 // //Created On : 01/10/2023
 // //Last Modified On : 01/10/2023
@@ -57,6 +57,7 @@ void processData(const std::string& fileName)
     inFile.seekg(0);
 
     float x{}, y{}, z{};
+    Eigen::Vector3f offset{0.5f*numStepsX*stepLength, 0.5f*numStepsY*stepLength, 0.5f*(bounds.zmax + bounds.zmin)};
 
     while (inFile >> x >> y >> z)
     {
@@ -85,7 +86,7 @@ void processData(const std::string& fileName)
             if(!buckets[i][j].empty())
             {
                 meanPoint /= static_cast<const float&>(buckets[i][j].size());
-                grid[i][j] = Eigen::Vector3f{i*stepLength, j*stepLength, meanPoint};
+                grid[i][j] = Eigen::Vector3f{i*stepLength, j*stepLength, meanPoint} - offset;
                 fillMask[i][j] = true;
             }
         }
@@ -165,27 +166,69 @@ void writeIndexFile(const std::string& filePath, int numX, int numY)
     }
 
     std::vector<int> indices{};
+    std::vector<int> neighbours{};
 
-    for(unsigned int i = 0; i < numX-1; i++)       // for each row a.k.a. each strip
+    // useful constants:
+    const int trianglesInARow = 2*(numY-1);
+    const int totalTris = trianglesInARow * (numX-1);
+    // loop through grid squares and index each triangle in square:
+    for(int i = 0; i < numX-1; i++)
     {
-        for (unsigned int j = 0; j < numY-1; j++) // for each column
+        // useful constant:
+        const int numTrianglesUptoThisRow = 2*i*(numY-1);
+        for (int j = 0; j < numY-1; j++)
         {
+            // useful constants
+            const int evenTriangle = 2*(i*(numY-1) + j);
+            const int oddTriangle = evenTriangle + 1;
+            
+            // first triangle
             indices.emplace_back(j+i*numY);
             indices.emplace_back((j+1)+i*numY);
             indices.emplace_back(j+(i+1)*numY);
 
+            // calculate neighbour-triangles and set to -1 if out of bounds:
+            int T0 = oddTriangle;
+            T0 = T0 < numTrianglesUptoThisRow + trianglesInARow ? T0: -1;
+            
+            int T1 = evenTriangle - 1;
+            T1 = T1 > numTrianglesUptoThisRow ? T1: -1;
+            
+            int T2 = evenTriangle - trianglesInARow + 1;
+            T2 = T2 > 0 ? T2: -1;
+
+            neighbours.emplace_back(T0);
+            neighbours.emplace_back(T1);
+            neighbours.emplace_back(T2);
+
+            // second triangle
             indices.emplace_back((j+1)+i*numY);
             indices.emplace_back((j+1)+(i+1)*numY);
             indices.emplace_back(j+(i+1)*numY);
+
+            // calculate neighbour-triangles and set to -1 if out of bounds:
+            T0 = evenTriangle + trianglesInARow;
+            T0 = T0 < totalTris ? T0: -1;
+            
+            T1 = evenTriangle;
+            T1 = T1 >= numTrianglesUptoThisRow ? T1: -1;
+            
+            T2 = oddTriangle + 1;
+            T2 = T2 < numTrianglesUptoThisRow + trianglesInARow ? T2: -1;
+
+            neighbours.emplace_back(T0);
+            neighbours.emplace_back(T1);
+            neighbours.emplace_back(T2);
         }
     }
 
-    outFile << 2*(numY-1)*(numX-1) << "\n";
-    std::cout << indices.size() << " " << 2*(numY-1)*(numX-1) << std::endl;
+    outFile << totalTris << "\n";
+    std::cout << indices.size() << " " << totalTris << std::endl;
 
     for (size_t i = 2; i < indices.size(); i+=3)
     {
-        outFile << indices[i-2] << " " << indices[i-1] << " " << indices[i] << " " << -1 << " " << -1 << " " << -1 << "\n";
+        outFile << indices[i-2] << " " << indices[i-1] << " " << indices[i] << " "
+        << neighbours[i-2] << " " << neighbours[i-1] << " " << neighbours[i] << "\n";
     }
 
     outFile.close();
